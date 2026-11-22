@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flowers for You, Cherish</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100svh; display: grid; place-items: center;
+      overflow: hidden; color: #fff7ef;
+      background: radial-gradient(ellipse at 50% 42%, #49313d 0%, #211c2a 50%, #100f18 100%);
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+    .scene { width: min(94vw, 760px); text-align: center; padding: 22px 12px 28px; }
+    h1 { margin: 0 0 8px; font-weight: 400; letter-spacing: .04em; font-size: clamp(1.8rem, 6vw, 3.3rem); }
+    .subtitle { margin: 0 0 14px; color: #f0c8d7; font: 12px/1.5 system-ui, sans-serif; letter-spacing: .22em; text-transform: uppercase; }
+    canvas { display: block; width: 100%; height: min(68svh, 540px); min-height: 330px; touch-action: manipulation; }
+    .hint { margin: 3px 0 0; color: #d1b9c7; font: 13px system-ui, sans-serif; }
+    .dedication { margin: 12px auto 0; max-width: 420px; color: #f3d9e3; font: italic 15px/1.6 Georgia, serif; }
+    h1 { text-wrap: balance; }
+    button { margin-top: 17px; padding: 11px 22px; border: 1px solid #e8b8ca; border-radius: 99px; background: #f4dce5; color: #482b3b; font: 600 13px system-ui, sans-serif; cursor: pointer; transition: transform .2s, background .2s; }
+    button:hover { transform: translateY(-2px); background: #fff0f5; }
+    button:focus-visible { outline: 3px solid #f6d7a5; outline-offset: 4px; }
+  </style>
+</head>
+<body>
+  <main class="scene">
+    <h1>Flowers for my Lovely, <span style="color:#f2b8ce">Cherish</span></h1>
+    <p class="subtitle">I hope this makes your day!</p>
+    <canvas id="garden" aria-label="May this flower reminds you of how beautiful you can be as you grow!"></canvas>
+    <p class="hint">touch again to restart🥰</p>
+    <p class="dedication">May beautiful things keep finding their way to you.</p>
+    <button id="again" type="button">Let it bloom again ✿</button>
+  </main>
+<script>
+(() => {
+  const canvas = document.getElementById('garden');
+  const ctx = canvas.getContext('2d');
+  const button = document.getElementById('again');
+  let width = 0, height = 0, flowers = [], startTime = 0, raf = 0;
+  const palettes = [
+    { petal: '#f6b8c9', light: '#ffe1e6', center: '#e9b75d' },
+    { petal: '#f6d6a1', light: '#fff0cb', center: '#9b633e' },
+    { petal: '#c8b7ed', light: '#e9ddff', center: '#e8c36d' },
+    { petal: '#f5a9a0', light: '#ffd6ca', center: '#8c633e' },
+    { petal: '#fff0e0', light: '#ffffff', center: '#e8bd63' }
+  ];
+  const clamp = (v, a=0, b=1) => Math.max(a, Math.min(b, v));
+  const ease = t => { t = clamp(t); return t*t*(3-2*t); };
+  const smooth = (a,b,t) => ease((t-a)/(b-a));
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = rect.width; height = rect.height;
+    canvas.width = Math.round(width*dpr); canvas.height = Math.round(height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    makeBouquet();
+  }
+  function makeBouquet() {
+    const cx = width/2, base = height*.91;
+    const scale = Math.min(width/430, height/390, 1.25);
+    const specs = [
+      {x:-105,y:.39,size:24,tilt:-.32,p:1}, {x:-59,y:.27,size:28,tilt:-.16,p:0},
+      {x:-8,y:.18,size:25,tilt:-.04,p:4}, {x:48,y:.25,size:31,tilt:.18,p:2},
+      {x:99,y:.40,size:25,tilt:.34,p:3}, {x:-35,y:.47,size:21,tilt:-.22,p:3},
+      {x:38,y:.46,size:22,tilt:.24,p:1}
+    ];
+    flowers = specs.map((s,i) => ({
+      x:cx+s.x*scale, y:base-height*s.y, baseX:cx+(s.x*.25)*scale,
+      baseY:base, size:s.size*scale, tilt:s.tilt, palette:palettes[s.p],
+      delay:i*.48, phase:i*1.7, leaves:[.27,.48,.66].map((v,j)=>({at:v, side:(j%2?1:-1)*(i%2?-1:1)}))
+    }));
+    startTime = performance.now();
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(draw);
+  }
+  function stemPoint(f,t) {
+    const sway = Math.sin(performance.now()/1300+f.phase)*2.2;
+    const x1=f.baseX, y1=f.baseY, x2=f.x, y2=f.y;
+    const cx1=x1+(x2-x1)*.12+sway, cy1=y1-(y1-y2)*.48;
+    const cx2=x1+(x2-x1)*.82+sway, cy2=y2+(y1-y2)*.22;
+    const u=1-t;
+    return {x:u*u*u*x1+3*u*u*t*cx1+3*u*t*t*cx2+t*t*t*x2,
+            y:u*u*u*y1+3*u*u*t*cy1+3*u*t*t*cy2+t*t*t*y2};
+  }
+  function drawLeaf(x,y,angle,len,progress) {
+    ctx.save(); ctx.translate(x,y); ctx.rotate(angle);
+    ctx.scale(progress,progress);
+    const g=ctx.createLinearGradient(0,-len,0,len*.2);
+    g.addColorStop(0,'#9acb83'); g.addColorStop(1,'#326b4a');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.quadraticCurveTo(len*.85,-len*.8,len,-len*.15);
+    ctx.quadraticCurveTo(len*.52,len*.28,0,0); ctx.fill();
+    ctx.strokeStyle='rgba(220,242,190,.48)'; ctx.lineWidth=.8;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(len*.48,-len*.25,len,-len*.15); ctx.stroke();
+    ctx.restore();
+  }
+  function drawFlower(f, bloom) {
+    const petalCount=9, open=ease(bloom);
+    ctx.save(); ctx.translate(f.x,f.y); ctx.rotate(f.tilt);
+    const radius=f.size*(.18+.82*open);
+    for(let i=0;i<petalCount;i++) {
+      const a=i*Math.PI*2/petalCount;
+      ctx.save(); ctx.rotate(a);
+      ctx.translate(0,-radius*.52);
+      ctx.scale(.25+.75*open, .2+.8*open);
+      const grad=ctx.createLinearGradient(0,-f.size*.95,0,f.size*.28);
+      grad.addColorStop(0,f.palette.light); grad.addColorStop(1,f.palette.petal);
+      ctx.fillStyle=grad; ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.bezierCurveTo(-f.size*.34,-f.size*.42,-f.size*.30,-f.size*.98,0,-f.size);
+      ctx.bezierCurveTo(f.size*.30,-f.size*.98,f.size*.34,-f.size*.42,0,0);
+      ctx.fill(); ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(0,0,f.size*.19*open,0,Math.PI*2);
+    ctx.fillStyle=f.palette.center; ctx.fill();
+    ctx.fillStyle='rgba(255,246,202,.7)';
+    for(let i=0;i<7;i++){const a=i*2.4,r=f.size*.10*open;ctx.beginPath();ctx.arc(Math.cos(a)*r,Math.sin(a)*r,1.1,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+  function draw(now) {
+    ctx.clearRect(0,0,width,height);
+    const elapsed=(now-startTime)/1000;
+    // A soft pool of light behind the bouquet.
+    const glow=ctx.createRadialGradient(width/2,height*.54,4,width/2,height*.54,height*.48);
+    glow.addColorStop(0,'rgba(132,174,119,.13)'); glow.addColorStop(1,'rgba(132,174,119,0)');
+    ctx.fillStyle=glow; ctx.fillRect(0,0,width,height);
+    // Stems and leaves grow upward from the bottom, one after another.
+    flowers.forEach(f => {
+      const t=clamp((elapsed-f.delay*.35)/2.65);
+      if(t<=0)return;
+      ctx.lineCap='round'; ctx.lineWidth=2.8;
+      const grad=ctx.createLinearGradient(f.baseX,f.baseY,f.x,f.y);
+      grad.addColorStop(0,'#28583e'); grad.addColorStop(1,'#8ab978');
+      ctx.strokeStyle=grad; ctx.beginPath();
+      const steps=35, end=Math.floor(t*steps);
+      for(let i=0;i<=end;i++){const p=stemPoint(f,i/steps); if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);}
+      ctx.stroke();
+      f.leaves.forEach((leaf,j)=>{
+        const leafProgress=smooth(leaf.at,leaf.at+.18,t);
+        if(leafProgress>0){const p=stemPoint(f,leaf.at);drawLeaf(p.x,p.y,leaf.side*.85,18*Math.min(width/430,1.2),leafProgress);}
+      });
+      const bloom=smooth(2.1+f.delay*.35,3.5+f.delay*.35,elapsed);
+      if(bloom>0) drawFlower(f,bloom);
+    });
+    // Soft blush wrapping paper gathers the stems into a bouquet.
+    const wrapY = height*.79;
+    const wrapW = Math.min(width*.39, 158);
+    const wrapH = Math.min(height*.25, 112);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(width/2-wrapW*.48, wrapY-wrapH*.42);
+    ctx.quadraticCurveTo(width/2, wrapY-wrapH*.18, width/2+wrapW*.48, wrapY-wrapH*.42);
+    ctx.lineTo(width/2+wrapW*.27, wrapY+wrapH*.48);
+    ctx.quadraticCurveTo(width/2, wrapY+wrapH*.60, width/2-wrapW*.27, wrapY+wrapH*.48);
+    ctx.closePath();
+    const paper = ctx.createLinearGradient(width/2-wrapW/2, wrapY, width/2+wrapW/2, wrapY+wrapH);
+    paper.addColorStop(0,'#f8dce5'); paper.addColorStop(.52,'#eab8cc'); paper.addColorStop(1,'#c98da9');
+    ctx.fillStyle=paper; ctx.fill();
+    ctx.strokeStyle='rgba(255,239,245,.72)'; ctx.lineWidth=1.5; ctx.stroke();
+    // A little ribbon around the paper.
+    ctx.beginPath(); ctx.moveTo(width/2-wrapW*.30,wrapY+wrapH*.03);
+    ctx.quadraticCurveTo(width/2,wrapY+wrapH*.15,width/2+wrapW*.30,wrapY+wrapH*.03);
+    ctx.strokeStyle='#a85e83'; ctx.lineWidth=4; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(width/2-wrapW*.10,wrapY+wrapH*.10,wrapW*.12,wrapH*.07,-.35,0,Math.PI*2);
+    ctx.ellipse(width/2+wrapW*.10,wrapY+wrapH*.10,wrapW*.12,wrapH*.07,.35,0,Math.PI*2);
+    ctx.fillStyle='#f7d6e2'; ctx.fill(); ctx.strokeStyle='#a85e83'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(width/2,wrapY+wrapH*.12); ctx.lineTo(width/2-wrapW*.08,wrapY+wrapH*.30);
+    ctx.lineTo(width/2+wrapW*.02,wrapY+wrapH*.28); ctx.closePath(); ctx.fillStyle='#d88eae'; ctx.fill();
+    ctx.restore();
+    // Tiny drifting pollen glimmers.
+    for(let i=0;i<22;i++){
+      const x=(i*73+Math.sin(now/1700+i)*15)%width;
+      const y=(height*.22+(i*47+Math.sin(now/1200+i*2)*12)%(height*.58));
+      const alpha=.15+.25*(.5+.5*Math.sin(now/650+i));
+      ctx.fillStyle=`rgba(247,224,160,${alpha})`; ctx.beginPath();ctx.arc(x,y,1.1,0,Math.PI*2);ctx.fill();
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  button.addEventListener('click',makeBouquet);
+  canvas.addEventListener('click',makeBouquet);
+  window.addEventListener('resize',resize);
+  resize();
+})();
+</script>
+</body>
+</html>
